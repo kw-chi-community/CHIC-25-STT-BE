@@ -1,3 +1,11 @@
 # BE
 fastapi
 uvicorn[standard]
+
+mysql-connector-python
+python-jose[cryptography]
+datetime
+passlib
+python-multipart
+sqlalchemy
+pymysql

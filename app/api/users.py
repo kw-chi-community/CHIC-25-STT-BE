@@ -63,17 +63,18 @@ async def login(
     password: str = Form(...), 
     db: Session = Depends(get_db)
 ):
+    # 요청 데이터를 확인하기 위한 로그 출력 (비밀번호 전체는 출력하지 않음)
+    logging.info(f"Received login request: userid={userid}, password_length={len(password)}")
+    
     try:
         user = db.query(User).filter(User.userid == userid).first()
         if not user or not verify_password(password, user.hashed_password):
             raise HTTPException(status_code=400, detail="Incorrect userid or password")
         access_token = create_access_token(
-            {"sub": user.userid},  # payload를 위치 인자로 전달
+            {"sub": user.userid},
             expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         )
         return {"access_token": access_token, "token_type": "bearer"}
     except Exception as e:
         logging.error(f"Login error: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
-
-

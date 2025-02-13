@@ -34,21 +34,22 @@ async def get_users(current_user: User = Depends(get_current_user), db: Session 
     return [{"id": user.id, "username": user.username, "userid": user.userid} for user in users]
 router = APIRouter()
 
-# Pydantic 모델 정의 (회원가입 요청용)
-class RegisterUser(BaseModel):
-    username: str
-    userid: str
-    password: str
+from fastapi import Body
 
 @router.post("/")
-async def create_user(user: RegisterUser, db: Session = Depends(get_db)):
-    # 이름(username) 또는 아이디(userid)가 이미 존재하는지 확인
-    existing_user = db.query(User).filter(or_(User.username == user.username, User.userid == user.userid)).first()
+async def create_user(
+    username: str = Body(...),
+    userid: str = Body(...),
+    password: str = Body(...),
+    db: Session = Depends(get_db)
+):
+    # 중복 체크 및 사용자 생성 코드 동일
+    existing_user = db.query(User).filter(or_(User.username == username, User.userid == userid)).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Username or Userid already exists")
     
-    hashed_password = get_password_hash(user.password)
-    new_user = User(username=user.username, userid=user.userid, hashed_password=hashed_password)
+    hashed_password = get_password_hash(password)
+    new_user = User(username=username, userid=userid, hashed_password=hashed_password)
     db.add(new_user)
     try:
         db.commit()

@@ -1,9 +1,10 @@
 # /app/api/users.py
 import logging
+from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, Form
 from sqlalchemy.orm import Session
-from datetime import timedelta
 from sqlalchemy import or_
+from pydantic import BaseModel
 
 from app.utils.database import get_db
 from app.utils.auth import oauth2_scheme, get_password_hash, verify_password, ACCESS_TOKEN_EXPIRE_MINUTES
@@ -31,22 +32,23 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 async def get_users(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     users = db.query(User.id, User.username, User.userid).all()
     return [{"id": user.id, "username": user.username, "userid": user.userid} for user in users]
+router = APIRouter()
 
-# 회원가입 엔드포인트 (이름, 아이디, 비밀번호 3개 입력)
+# Pydantic 모델 정의 (회원가입 요청용)
+class RegisterUser(BaseModel):
+    username: str
+    userid: str
+    password: str
+
 @router.post("/")
-async def create_user(
-    username: str, 
-    userid: str, 
-    password: str, 
-    db: Session = Depends(get_db)
-):
+async def create_user(user: RegisterUser, db: Session = Depends(get_db)):
     # 이름(username) 또는 아이디(userid)가 이미 존재하는지 확인
-    existing_user = db.query(User).filter(or_(User.username == username, User.userid == userid)).first()
+    existing_user = db.query(User).filter(or_(User.username == user.username, User.userid == user.userid)).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Username or Userid already exists")
     
-    hashed_password = get_password_hash(password)
-    new_user = User(username=username, userid=userid, hashed_password=hashed_password)
+    hashed_password = get_password_hash(user.password)
+    new_user = User(username=user.username, userid=user.userid, hashed_password=hashed_password)
     db.add(new_user)
     try:
         db.commit()
@@ -78,3 +80,5 @@ async def login(
     except Exception as e:
         logging.error(f"Login error: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
+

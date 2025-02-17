@@ -39,3 +39,4 @@ async def add_cors_headers(request, call_next):
 from app.api.users import router as users_router
 
 app.include_router(users_router, prefix="/users")
+app.include_router(users_router, prefix="/meetings")

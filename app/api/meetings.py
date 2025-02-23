@@ -8,6 +8,11 @@ from app.utils.database import get_db
 from app.utils.models import Meeting, Topic, TopicDetail, Keyword, KeyTopic, Conversation
 from app.utils.verification import get_current_user  # 인증 모듈 추가
 
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
+
 router = APIRouter()
 
 # Pydantic 모델 정의
@@ -172,6 +177,7 @@ def get_meetings_by_month(
     db: Session = Depends(get_db), 
     user_id: int = Depends(get_current_user)  # 🔒 인증 필수
 ):
+    logging.debug(f"year:{year} month:{month} user_id:{user_id}")
     meetings = db.query(Meeting.id).filter(
         Meeting.meeting_date >= datetime(year, month, 1),
         Meeting.meeting_date < datetime(year, month + 1, 1) if month < 12 else datetime(year + 1, 1, 1)

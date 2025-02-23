@@ -10,8 +10,6 @@ python-multipart
 sqlalchemy
 pymysql
 
-
 openai
 uuid
-subprocess
 minio

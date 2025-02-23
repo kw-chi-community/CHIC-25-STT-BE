@@ -37,6 +37,9 @@ async def add_cors_headers(request, call_next):
 
 # 기능별 모듈(예, 사용자 관련 라우터) 등록
 from app.api.users import router as users_router
+from app.api.meetings import router as meetings_router
+from app.api.audio_recording import audio_router
 
 app.include_router(users_router, prefix="/users")
-app.include_router(users_router, prefix="/meetings")
+app.include_router(meetings_router, prefix="/meetings")
+app.include_router(audio_router, prefix="/audio_recording")

@@ -12,7 +12,7 @@ IS_DOCKER = os.getenv("IS_DOCKER", "false").lower() == "true"
 
 if not IS_DOCKER:
     load_dotenv()  # 로컬 개발 환경에서는 .env 파일 로드
-    
+
 # APIRouter 생성
 audio_router = APIRouter()
 
@@ -30,7 +30,7 @@ MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY")
 MINIO_BUCKET_NAME = os.getenv("MINIO_BUCKET_NAME")
 
 minio_client = Minio(
-    MINIO_ENDPOINT,
+    MINIO_ENDPOINT.replace("http://", "").replace("https://", ""),  # 프로토콜 제거
     access_key=MINIO_ACCESS_KEY,
     secret_key=MINIO_SECRET_KEY,
     secure=False

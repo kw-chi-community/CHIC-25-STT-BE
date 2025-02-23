@@ -165,7 +165,7 @@ def add_conversation(
     return new_conversation
 
 # 🔒 특정 년/월의 meeting_id 조회 API (인증 추가)
-@router.get("/meetings/by-date/{year}/{month}", response_model=List[MeetingIDResponse])
+@router.get("/by-date/{year}/{month}", response_model=List[MeetingIDResponse])
 def get_meetings_by_month(
     year: int, 
     month: int, 
@@ -183,7 +183,7 @@ def get_meetings_by_month(
     return meetings
 
 # 🔒 특정 년/월/일의 meeting_id 조회 API (인증 추가)
-@router.get("/meetings/by-date/{year}/{month}/{day}", response_model=List[MeetingIDResponse])
+@router.get("/by-date/{year}/{month}/{day}", response_model=List[MeetingIDResponse])
 def get_meetings_by_day(
     year: int, 
     month: int, 

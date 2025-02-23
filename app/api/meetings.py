@@ -3,19 +3,24 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List, Optional
-from datetime import datetime  #  datetime 추가
+from datetime import datetime
 from app.utils.database import get_db
 from app.utils.models import Meeting, Topic, TopicDetail, Keyword, KeyTopic, Conversation
 
 router = APIRouter()
 
-#  Pydantic 모델 정의
+# Pydantic 모델 정의
 class MeetingCreate(BaseModel):
     meeting_name: str
-    meeting_date: datetime  #  datetime 사용
+    meeting_date: datetime
     audio_url: Optional[str] = None
 
 class MeetingResponse(MeetingCreate):
+    id: int
+    class Config:
+        orm_mode = True
+
+class MeetingIDResponse(BaseModel):
     id: int
     class Config:
         orm_mode = True
@@ -60,10 +65,9 @@ class ConversationResponse(ConversationCreate):
     class Config:
         orm_mode = True
 
-#  회의 생성 API
+# 회의 생성 API
 @router.post("/", response_model=MeetingResponse)
 def create_meeting(meeting: MeetingCreate, db: Session = Depends(get_db)):
-    #  새로운 회의 생성
     new_meeting = Meeting(**meeting.dict())
     db.add(new_meeting)
     db.commit()
@@ -75,15 +79,11 @@ def create_meeting(meeting: MeetingCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(default_topic)
 
-    #  기본 주제의 세부 내용 추가
+    # 기본 주제의 세부 내용 추가
     default_topic_detail = TopicDetail(topic_id=default_topic.id, detail="기본 주제에 대한 세부 내용")
     db.add(default_topic_detail)
 
-    #  요약 추가
-    summary = "회의에서 다룬 주요 내용을 요약한 자동 생성된 텍스트입니다."
-    
-
-    #  기본 키워드 추가
+    # 기본 키워드 추가
     default_keyword = Keyword(meeting_id=new_meeting.id, keyword="기본 키워드", summary="이 키워드는 자동 생성됨")
     db.add(default_keyword)
 
@@ -92,13 +92,12 @@ def create_meeting(meeting: MeetingCreate, db: Session = Depends(get_db)):
 
     return new_meeting
 
-
-#  모든 회의 조회 API
+# 모든 회의 조회 API
 @router.get("/", response_model=List[MeetingResponse])
 def get_meetings(db: Session = Depends(get_db)):
     return db.query(Meeting).all()
 
-#  특정 회의 조회 API
+# 특정 회의 조회 API
 @router.get("/{meeting_id}", response_model=MeetingResponse)
 def get_meeting(meeting_id: int, db: Session = Depends(get_db)):
     meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
@@ -106,19 +105,22 @@ def get_meeting(meeting_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Meeting not found")
     return meeting
 
-
 # 특정 회의의 주제 조회 API
-@router.get("/{meeting_id}/topics", response_model=List[TopicResponse])  # ✅ meeting_name → meeting_id 변경
+@router.get("/{meeting_id}/topics", response_model=List[TopicResponse])
 def get_topics(meeting_id: int, db: Session = Depends(get_db)):
     return db.query(Topic).filter(Topic.meeting_id == meeting_id).all()
 
-
-#  특정 회의의 핵심 주제 조회 API
+# 특정 회의의 핵심 주제 조회 API
 @router.get("/{meeting_id}/key_topics", response_model=List[KeyTopicResponse])
 def get_key_topics(meeting_id: int, db: Session = Depends(get_db)):
     return db.query(KeyTopic).filter(KeyTopic.meeting_id == meeting_id).all()
 
-#  대화 기록 추가 API
+# 특정 회의의 대화 내용 조회 API
+@router.get("/{meeting_id}/conversations", response_model=List[ConversationResponse])
+def get_conversations(meeting_id: int, db: Session = Depends(get_db)):
+    return db.query(Conversation).filter(Conversation.meeting_id == meeting_id).all()
+
+# 특정 회의의 대화 기록 추가 API
 @router.post("/{meeting_id}/conversations", response_model=ConversationResponse)
 def add_conversation(meeting_id: int, conversation: ConversationCreate, db: Session = Depends(get_db)):
     new_conversation = Conversation(
@@ -133,7 +135,28 @@ def add_conversation(meeting_id: int, conversation: ConversationCreate, db: Sess
     db.refresh(new_conversation)
     return new_conversation
 
-#  특정 회의의 대화 내용 조회 API
-@router.get("/{meeting_id}/conversations", response_model=List[ConversationResponse])
-def get_conversations(meeting_id: int, db: Session = Depends(get_db)):
-    return db.query(Conversation).filter(Conversation.meeting_id == meeting_id).all()
+# 특정 년/월의 meeting_id 조회 API
+@router.get("/meetings/by-date/{year}/{month}", response_model=List[MeetingIDResponse])
+def get_meetings_by_month(year: int, month: int, db: Session = Depends(get_db)):
+    meetings = db.query(Meeting.id).filter(
+        Meeting.meeting_date >= datetime(year, month, 1),
+        Meeting.meeting_date < datetime(year, month + 1, 1) if month < 12 else datetime(year + 1, 1, 1)
+    ).all()
+    
+    if not meetings:
+        raise HTTPException(status_code=404, detail="No meetings found for this month")
+    
+    return meetings
+
+# 특정 년/월/일의 meeting_id 조회 API
+@router.get("/meetings/by-date/{year}/{month}/{day}", response_model=List[MeetingIDResponse])
+def get_meetings_by_day(year: int, month: int, day: int, db: Session = Depends(get_db)):
+    meetings = db.query(Meeting.id).filter(
+        Meeting.meeting_date >= datetime(year, month, day),
+        Meeting.meeting_date < datetime(year, month, day + 1)
+    ).all()
+    
+    if not meetings:
+        raise HTTPException(status_code=404, detail="No meetings found for this date")
+    
+    return meetings

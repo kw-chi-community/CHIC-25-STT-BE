@@ -2,6 +2,7 @@
 import logging
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, Form
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from pydantic import BaseModel
@@ -60,24 +61,27 @@ async def create_user(
     return {"msg": "User created successfully", "username": new_user.username, "userid": new_user.userid}
 
 # 로그인 엔드포인트
-@router.post("/login")
+@router.post("/users/login")
 async def login(
-    userid: str = Form(...), 
-    password: str = Form(...), 
+    form_data: OAuth2PasswordRequestForm = Depends(), 
     db: Session = Depends(get_db)
 ):
-    # 요청 데이터를 확인하기 위한 로그 출력 (비밀번호 전체는 출력하지 않음)
+    userid = form_data.username  # OAuth2PasswordRequestForm은 "username" 필드를 사용
+    password = form_data.password
+
     logging.info(f"Received login request: userid={userid}, password_length={len(password)}")
-    
+
     try:
         user = db.query(User).filter(User.userid == userid).first()
         if not user or not verify_password(password, user.hashed_password):
             raise HTTPException(status_code=400, detail="Incorrect userid or password")
+        
         access_token = create_access_token(
             {"sub": user.userid},
             expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         )
         return {"access_token": access_token, "token_type": "bearer"}
+    
     except Exception as e:
         logging.error(f"Login error: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")

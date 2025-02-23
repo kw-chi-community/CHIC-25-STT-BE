@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime  #  datetime 추가
 from app.utils.database import get_db
-from app.models import Meeting, Topic, TopicDetail, Keyword, KeyTopic, Conversation
+from app.utils.models import Meeting, Topic, TopicDetail, Keyword, KeyTopic, Conversation
 
 router = APIRouter()
 

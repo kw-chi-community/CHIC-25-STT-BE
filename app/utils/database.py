@@ -5,8 +5,11 @@ from sqlalchemy.orm import sessionmaker
 import os
 from dotenv import load_dotenv
 
-# .env 파일에서 환경 변수 로드
-load_dotenv()
+# Docker 환경인지 확인
+IS_DOCKER = os.getenv("IS_DOCKER", "false").lower() == "true"
+
+if not IS_DOCKER:
+    load_dotenv()  # 로컬 개발 환경에서는 .env 파일 로드
 
 # .env 파일에서 DATABASE_URL 읽기
 DATABASE_URL = os.getenv("DATABASE_URL")

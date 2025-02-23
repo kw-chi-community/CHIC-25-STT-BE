@@ -7,9 +7,12 @@ import subprocess
 from dotenv import load_dotenv
 from minio import Minio
 
-# 환경 변수 로드
-load_dotenv()
+# Docker 환경인지 확인
+IS_DOCKER = os.getenv("IS_DOCKER", "false").lower() == "true"
 
+if not IS_DOCKER:
+    load_dotenv()  # 로컬 개발 환경에서는 .env 파일 로드
+    
 # APIRouter 생성
 audio_router = APIRouter()
 

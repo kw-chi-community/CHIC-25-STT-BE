@@ -60,6 +60,7 @@ jobs:
 
     # 2️⃣ 서버로 `docker-compose.yml`을 전송
     - name: Transfer Docker Compose file to temporary location
+      working-directory: ${{ github.workspace }}
       run: |
         scp -o StrictHostKeyChecking=no $(pwd)/docker-compose.yml \
           ${{ secrets.SSH_ID }}@${{ secrets.SSH_SERVER_IP }}:/tmp/docker-compose.yml

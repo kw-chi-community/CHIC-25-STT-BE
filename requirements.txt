@@ -13,3 +13,7 @@ pymysql
 openai
 uuid
 minio
+
+celery
+kombu
+ffmpeg-python

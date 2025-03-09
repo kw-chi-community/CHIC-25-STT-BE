@@ -1,59 +1,67 @@
-name: Build and Deploy Docker Image
+name: Build and Deploy Docker Compose
 
 on:
   push:
     branches:
-      - main  # 메인 브랜치에 푸시될 때 실행
+      - main
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. GitHub에서 코드 체크아웃
     - name: Checkout code
       uses: actions/checkout@v2
 
-    # 2. Docker Hub에 로그인
     - name: Log in to Docker Hub
       run: |
         echo "${{ secrets.DOCKER_HUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
 
-    # 3. Docker 이미지 빌드 및 태그 (no-cache 옵션 추가)
-    - name: Build and tag Docker image
+    - name: Build images using docker-compose
       run: |
-        docker build --no-cache -t ${{ secrets.DOCKER_HUB_USERNAME }}/chic_stt_backend:latest .
-        docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/chic_stt_backend:latest ${{ secrets.DOCKER_HUB_USERNAME }}/chic_stt_backend:latest
+        docker-compose build
 
-    # 4. Docker Hub로 푸시
-    - name: Push Docker image to Docker Hub
+    - name: Tag and push FastAPI image
       run: |
+        docker tag fastapi_app ${{ secrets.DOCKER_HUB_USERNAME }}/chic_stt_backend:latest
         docker push ${{ secrets.DOCKER_HUB_USERNAME }}/chic_stt_backend:latest
+
+    - name: Tag and push Celery worker image
+      run: |
+        docker tag celery_worker ${{ secrets.DOCKER_HUB_USERNAME }}/chic_stt_worker:latest
+        docker push ${{ secrets.DOCKER_HUB_USERNAME }}/chic_stt_worker:latest
 
   deploy:
     runs-on: ubuntu-latest
-    needs: build-and-push  # 'build-and-push' 작업이 완료되면 실행
+    needs: build-and-push  # build-and-push 작업 완료 후 실행
 
     steps:
-    - name: Install SSH and sshpass
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y openssh-client sshpass
+    - name: Install SSH client
+      run: sudo apt-get update && sudo apt-get install -y openssh-client
 
-    # 5. Docker Hub에 로그인 (서버에서 이미지 풀링 전)
-    - name: Log in to Docker Hub on the server
+    - name: Set up SSH key
       run: |
-        echo "${{ secrets.DOCKER_HUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H ${{ secrets.SSH_SERVER_IP }} >> ~/.ssh/known_hosts
 
-    # 6. SSH 접속 및 Docker 이미지 Pull & Run
     - name: Deploy to Server
       run: |
-        echo "Starting deployment..."
-        sshpass -p "${{ secrets.SSH_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_ID }}@${{ secrets.SSH_SERVER_IP }} << 'EOF'
-          IMAGE="${{ secrets.DOCKER_HUB_USERNAME }}/chic_stt_backend:latest"
-          echo "${{ secrets.SSH_PASSWORD }}" | sudo -S docker pull $IMAGE
-          echo "${{ secrets.SSH_PASSWORD }}" | sudo -S docker stop chic_STT_backend || true
-          echo "${{ secrets.SSH_PASSWORD }}" | sudo -S docker rm chic_STT_backend || true
-          echo "${{ secrets.SSH_PASSWORD }}" | sudo -S docker run -d --name chic_STT_backend --env-file /home/chunsoo/Desktop/chic_stt/.env -e IS_DOCKER=true -p 25114:8000 $IMAGE
-          echo "${{ secrets.SSH_PASSWORD }}" | sudo -S docker system prune -af
+        ssh ${{ secrets.SSH_ID }}@${{ secrets.SSH_SERVER_IP }} << 'EOF'
+          # 최신 이미지 Pull
+          echo "Pulling latest Docker images..."
+          docker-compose pull
+
+          # 기존 컨테이너 중지 및 삭제
+          echo "Stopping existing services..."
+          docker-compose down
+
+          # 새로운 컨테이너 실행
+          echo "Starting new services..."
+          docker-compose up -d
+
+          # 불필요한 이미지 및 캐시 삭제
+          echo "Cleaning up unused Docker images..."
+          docker system prune -af
         EOF

@@ -6,6 +6,8 @@ import uuid
 import subprocess
 from dotenv import load_dotenv
 from minio import Minio
+from celery_app import celery_app
+from celery import shared_task
 
 # Docker 환경인지 확인
 IS_DOCKER = os.getenv("IS_DOCKER", "false").lower() == "true"
@@ -80,18 +82,38 @@ def upload_to_minio(file_path, file_name):
     except Exception as e:
         print(f"❌ Error uploading to MinIO: {e}")
 
+@shared_task
+def process_audio_task(file_id):
+    webm_file_path = os.path.join(SAVE_PATH, f"{file_id}.webm")
+    wav_file_path = os.path.join(SAVE_PATH, f"{file_id}.wav")
+
+    # WebM -> WAV 변환
+    convert_webm_to_wav(webm_file_path, wav_file_path)
+
+    # Whisper API를 사용해 오디오를 텍스트로 변환
+    transcription = transcribe_audio(wav_file_path)
+    print(f"📝 Transcription: {transcription}")
+
+    # WAV 파일 MinIO 업로드 및 삭제
+    upload_to_minio(wav_file_path, f"{file_id}.wav")
+
+    # WebM 파일 삭제
+    if os.path.exists(webm_file_path):
+        os.remove(webm_file_path)
+        print(f"🗑️ Deleted local file: {webm_file_path}")
+
+    return transcription
+
 @audio_router.websocket("/ws/audio")
 async def audio_stream(websocket: WebSocket):
     """
-    WebSocket을 통해 실시간 오디오 데이터를 수신하고, 변환 후 텍스트를 반환하는 엔드포인트
+    WebSocket을 통해 실시간 오디오 데이터를 수신하고 MinIO에 저장 후 Celery 작업 큐에 추가
     """
     await websocket.accept()
     print("✅ WebSocket connection established.")
 
-    # 임시 WebM 및 WAV 파일 생성
     file_id = str(uuid.uuid4())
     webm_file_path = os.path.join(SAVE_PATH, f"{file_id}.webm")
-    wav_file_path = os.path.join(SAVE_PATH, f"{file_id}.wav")
 
     frames = []
     total_bytes_received = 0
@@ -121,35 +143,15 @@ async def audio_stream(websocket: WebSocket):
             webm_file.write(b''.join(frames))
         print(f"✅ WebM file saved: {webm_file_path}")
 
-        # WebM -> WAV 변환
-        convert_webm_to_wav(webm_file_path, wav_file_path)
+        # MinIO에 WebM 파일 업로드
+        minio_client.fput_object(MINIO_BUCKET_NAME, f"{file_id}.webm", webm_file_path)
 
-        # Whisper API를 사용해 오디오를 텍스트로 변환
-        transcription = transcribe_audio(wav_file_path)
-        print(f"📝 Transcription: {transcription}")
-
-        # WAV 파일 MinIO 업로드 및 삭제
-        upload_to_minio(wav_file_path, f"{file_id}.wav")
-
-        # WebM 파일 삭제
-        if os.path.exists(webm_file_path):
-            os.remove(webm_file_path)
-            print(f"🗑️ Deleted local file: {webm_file_path}")
-
-    except Exception as e:
-        print(f"❌ Unexpected Error: {e}")
-        if websocket.client_state == WebSocketState.CONNECTED:
-            try:
-                await websocket.send_text("Error occurred during processing.")
-                print("📤 Sent error message to client.")
-            except RuntimeError as e:
-                print(f"❌ WebSocket closed before sending error message: {e}")
+        # Celery Task 실행
+        task = process_audio_task.delay(file_id)
+        await websocket.send_text(f"Task submitted: {task.id}")
+        print(f"📤 Task {task.id} submitted to Celery.")
 
     finally:
-        # WebSocket이 연결된 상태라면 안전하게 닫기
         if websocket.client_state == WebSocketState.CONNECTED:
-            try:
-                await websocket.close()
-                print("🔌 WebSocket connection closed successfully.")
-            except RuntimeError as e:
-                print(f"❌ WebSocket already closed: {e}")
+            await websocket.close()
+            print("🔌 WebSocket connection closed successfully.")

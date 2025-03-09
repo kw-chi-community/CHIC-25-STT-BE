@@ -1,0 +1,24 @@
+from celery import Celery
+import os
+from dotenv import load_dotenv
+
+# Docker 환경인지 확인
+IS_DOCKER = os.getenv("IS_DOCKER", "false").lower() == "true"
+
+if not IS_DOCKER:
+    load_dotenv()  # 로컬 개발 환경에서는 .env 파일 로드
+
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL")
+CELERY_BACKEND_URL = os.getenv("CELERY_BACKEND_URL")
+
+app = Celery(
+    "audio_tasks",
+    broker=CELERY_BROKER_URL,
+    backend=CELERY_BACKEND_URL
+)
+
+app.conf.update(
+    task_routes={
+        "tasks.*": {"queue": "audio_queue"}
+    }
+)

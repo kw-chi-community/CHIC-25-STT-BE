@@ -6,44 +6,87 @@ on:
       - main
 
 jobs:
-  deploy:
+  build-and-push:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v2
 
-    - name: Install SSH and sshpass
+    - name: Install Docker Compose
       run: |
         sudo apt-get update
-        sudo apt-get install -y openssh-client sshpass
+        sudo apt-get install -y docker-compose
+        docker-compose version
 
-    # 1️⃣ 서버로 `docker-compose.yml`을 전송
+    - name: Log in to Docker Hub
+      run: |
+        echo "${{ secrets.DOCKER_HUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
+
+    - name: Build images using docker-compose
+      run: |
+        docker-compose build
+
+    - name: List Docker images (디버깅용)
+      run: |
+        echo "🔍 현재 존재하는 Docker 이미지:"
+        docker images
+
+    - name: Tag and push FastAPI image
+      run: |
+        docker tag chic-25-stt-be_fastapi ${{ secrets.DOCKER_HUB_USERNAME }}/fastapi_app:latest
+        docker push ${{ secrets.DOCKER_HUB_USERNAME }}/fastapi_app:latest
+
+    - name: Tag and push Celery worker image
+      run: |
+        docker tag chic-25-stt-be_celery_worker ${{ secrets.DOCKER_HUB_USERNAME }}/celery_worker:latest
+        docker push ${{ secrets.DOCKER_HUB_USERNAME }}/celery_worker:latest
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push  # 'build-and-push' 작업 완료 후 실행
+
+    steps:
+    - name: Install SSH client
+      run: sudo apt-get update && sudo apt-get install -y openssh-client
+
+    # 1️⃣ SSH 키 설정
+    - name: Set up SSH key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H ${{ secrets.SSH_SERVER_IP }} >> ~/.ssh/known_hosts
+
+    # 2️⃣ 서버로 `docker-compose.yml`을 전송
     - name: Transfer Docker Compose file to temporary location
       run: |
-        sshpass -p "${{ secrets.SSH_PASSWORD }}" scp -o StrictHostKeyChecking=no \
-          docker-compose.yml ${{ secrets.SSH_ID }}@${{ secrets.SSH_SERVER_IP }}:/tmp/docker-compose.yml
+        scp -o StrictHostKeyChecking=no docker-compose.yml \
+          ${{ secrets.SSH_ID }}@${{ secrets.SSH_SERVER_IP }}:/tmp/docker-compose.yml
 
-    # 2️⃣ `/home/ubuntu/docker-compose.yml`로 이동 (또는 원하는 경로 설정)
+    # 3️⃣ `/home/ubuntu/chic_stt/docker-compose.yml`로 이동 (또는 원하는 경로 설정)
     - name: Move Docker Compose file with sudo
       run: |
-        sshpass -p "${{ secrets.SSH_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_ID }}@${{ secrets.SSH_SERVER_IP }} << EOF
-          echo "${{ secrets.SSH_PASSWORD }}" | sudo -S mv /tmp/docker-compose.yml /home/ubuntu/chic_stt/docker-compose.yml
+        ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_ID }}@${{ secrets.SSH_SERVER_IP }} << EOF
+          sudo mv /tmp/docker-compose.yml /home/ubuntu/chic_stt/docker-compose.yml
         EOF
 
-    # 3️⃣ 서버에서 `docker-compose pull`, `docker-compose up -d` 실행
+    # 4️⃣ 서버에서 `docker-compose build`, `docker-compose pull`, `docker-compose up -d` 실행
     - name: Deploy with Docker Compose
       run: |
-        sshpass -p "${{ secrets.SSH_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_ID }}@${{ secrets.SSH_SERVER_IP }} << EOF
+        ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_ID }}@${{ secrets.SSH_SERVER_IP }} << EOF
+          echo "Building new Docker images..."
+          sudo docker-compose -f /home/ubuntu/chic_stt/docker-compose.yml build
+
           echo "Pulling latest Docker images..."
-          echo "${{ secrets.SSH_PASSWORD }}" | sudo -S docker-compose -f /home/ubuntu/chic_stt/docker-compose.yml pull
+          sudo docker-compose -f /home/ubuntu/chic_stt/docker-compose.yml pull
 
           echo "Stopping existing services..."
-          echo "${{ secrets.SSH_PASSWORD }}" | sudo -S docker-compose -f /home/ubuntu/chic_stt/docker-compose.yml down || true
+          sudo docker-compose -f /home/ubuntu/chic_stt/docker-compose.yml down || true
 
           echo "Starting new services..."
-          echo "${{ secrets.SSH_PASSWORD }}" | sudo -S docker-compose -f /home/ubuntu/chic_stt/docker-compose.yml up -d --env-file /home/ubuntu/.env
+          sudo docker-compose -f /home/ubuntu/chic_stt/docker-compose.yml up -d --env-file /home/ubuntu/chic_stt/.env
 
           echo "Cleaning up unused Docker images..."
-          echo "${{ secrets.SSH_PASSWORD }}" | sudo -S docker system prune -af
+          sudo docker system prune -af
         EOF

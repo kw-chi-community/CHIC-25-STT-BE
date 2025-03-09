@@ -12,6 +12,12 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v2
+    
+    - name: Verify working directory contents (recursive)
+      run: |
+        echo "🔍 전체 디렉토리 구조 확인"
+        ls -R ${{ github.workspace }}
+        pwd
 
     - name: Install Docker Compose
       run: |
@@ -60,13 +66,7 @@ jobs:
 
     - name: Transfer Docker Compose file to temporary location
       run: |
-        FILE_PATH="$(find ${{ github.workspace }} -name 'docker-compose.yml' | head -n 1)"
-        if [[ -z "$FILE_PATH" ]]; then
-          echo "🚨 docker-compose.yml 파일을 찾을 수 없습니다!"
-          exit 1
-        fi
-        echo "📂 Found docker-compose.yml at: $FILE_PATH"
-        scp -o StrictHostKeyChecking=no "$FILE_PATH" \
+        scp -o StrictHostKeyChecking=no ${{ github.workspace }}/docker-compose.yml \
           ${{ secrets.SSH_ID }}@${{ secrets.SSH_SERVER_IP }}:/tmp/docker-compose.yml
 
     # 3️⃣ `/home/ubuntu/chic_stt/docker-compose.yml`로 이동 (또는 원하는 경로 설정)

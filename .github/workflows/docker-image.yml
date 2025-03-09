@@ -27,6 +27,11 @@ jobs:
       run: |
         docker-compose build  # ✅ 이제 .env 없이 빌드 가능
 
+    - name: List Docker images (디버깅용)
+      run: |
+        echo "🔍 현재 존재하는 Docker 이미지:"
+        docker images
+
     - name: Tag and push FastAPI image
       run: |
         docker tag fastapi_app ${{ secrets.DOCKER_HUB_USERNAME }}/fastapi_app:latest

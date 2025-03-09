@@ -13,6 +13,11 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
+    - name: Verify working directory contents
+      run: |
+        echo "🔍 현재 디렉토리 확인"
+        ls -al
+
     - name: Install Docker Compose
       run: |
         sudo apt-get update

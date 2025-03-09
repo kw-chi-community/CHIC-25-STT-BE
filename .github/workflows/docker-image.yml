@@ -29,13 +29,13 @@ jobs:
 
     - name: Tag and push FastAPI image
       run: |
-        docker tag fastapi_app ${{ secrets.DOCKER_HUB_USERNAME }}/chic_stt_backend:latest
-        docker push ${{ secrets.DOCKER_HUB_USERNAME }}/chic_stt_backend:latest
+        docker tag fastapi_app ${{ secrets.DOCKER_HUB_USERNAME }}/fastapi_app:latest
+        docker push ${{ secrets.DOCKER_HUB_USERNAME }}/fastapi_app:latest
 
     - name: Tag and push Celery worker image
       run: |
-        docker tag celery_worker ${{ secrets.DOCKER_HUB_USERNAME }}/chic_stt_worker:latest
-        docker push ${{ secrets.DOCKER_HUB_USERNAME }}/chic_stt_worker:latest
+        docker tag celery_worker ${{ secrets.DOCKER_HUB_USERNAME }}/celery_worker:latest
+        docker push ${{ secrets.DOCKER_HUB_USERNAME }}/celery_worker:latest
 
   deploy:
     runs-on: ubuntu-latest

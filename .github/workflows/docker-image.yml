@@ -15,6 +15,8 @@ jobs:
 
     - name: Verify working directory contents
       run: |
+        echo "🔍 경로 확인"
+        pwd
         echo "🔍 현재 디렉토리 확인"
         ls -al
 

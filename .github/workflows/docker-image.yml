@@ -58,11 +58,15 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan -H ${{ secrets.SSH_SERVER_IP }} >> ~/.ssh/known_hosts
 
-    # 2️⃣ 서버로 `docker-compose.yml`을 전송
     - name: Transfer Docker Compose file to temporary location
-      working-directory: ${{ github.workspace }}
       run: |
-        scp -o StrictHostKeyChecking=no $(pwd)/docker-compose.yml \
+        FILE_PATH="$(find ${{ github.workspace }} -name 'docker-compose.yml' | head -n 1)"
+        if [[ -z "$FILE_PATH" ]]; then
+          echo "🚨 docker-compose.yml 파일을 찾을 수 없습니다!"
+          exit 1
+        fi
+        echo "📂 Found docker-compose.yml at: $FILE_PATH"
+        scp -o StrictHostKeyChecking=no "$FILE_PATH" \
           ${{ secrets.SSH_ID }}@${{ secrets.SSH_SERVER_IP }}:/tmp/docker-compose.yml
 
     # 3️⃣ `/home/ubuntu/chic_stt/docker-compose.yml`로 이동 (또는 원하는 경로 설정)

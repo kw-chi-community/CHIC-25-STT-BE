@@ -16,7 +16,7 @@ jobs:
     - name: Verify working directory contents (recursive)
       run: |
         echo "🔍 전체 디렉토리 구조 확인"
-        ls -R ${{ github.workspace }}
+        ls -lah ${{ github.workspace }}
         pwd
 
     - name: Install Docker Compose
@@ -66,7 +66,8 @@ jobs:
 
     - name: Transfer Docker Compose file to temporary location
       run: |
-        scp -o StrictHostKeyChecking=no ${{ github.workspace }}/docker-compose.yml \
+        cd ${{ github.workspace }}
+        scp -o StrictHostKeyChecking=no docker-compose.yml \
           ${{ secrets.SSH_ID }}@${{ secrets.SSH_SERVER_IP }}:/tmp/docker-compose.yml
 
     # 3️⃣ `/home/ubuntu/chic_stt/docker-compose.yml`로 이동 (또는 원하는 경로 설정)

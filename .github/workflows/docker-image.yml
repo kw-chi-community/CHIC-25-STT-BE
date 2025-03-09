@@ -25,7 +25,7 @@ jobs:
 
     - name: Build images using docker-compose
       run: |
-        docker-compose build  # ✅ 이제 .env 없이 빌드 가능
+        docker-compose build
 
     - name: List Docker images (디버깅용)
       run: |
@@ -34,12 +34,12 @@ jobs:
 
     - name: Tag and push FastAPI image
       run: |
-        docker tag fastapi_app ${{ secrets.DOCKER_HUB_USERNAME }}/fastapi_app:latest
+        docker tag chic-25-stt-be_fastapi ${{ secrets.DOCKER_HUB_USERNAME }}/fastapi_app:latest
         docker push ${{ secrets.DOCKER_HUB_USERNAME }}/fastapi_app:latest
 
     - name: Tag and push Celery worker image
       run: |
-        docker tag celery_worker ${{ secrets.DOCKER_HUB_USERNAME }}/celery_worker:latest
+        docker tag chic-25-stt-be_celery_worker ${{ secrets.DOCKER_HUB_USERNAME }}/celery_worker:latest
         docker push ${{ secrets.DOCKER_HUB_USERNAME }}/celery_worker:latest
 
   deploy:
@@ -68,7 +68,7 @@ jobs:
           echo "Stopping existing services..."
           docker-compose down
 
-          # 새로운 컨테이너 실행 (이제 env_file 적용)
+          # 새로운 컨테이너 실행 (서버의 /home/ubuntu/.env 사용)
           echo "Starting new services..."
           docker-compose up -d --env-file /home/ubuntu/.env
 

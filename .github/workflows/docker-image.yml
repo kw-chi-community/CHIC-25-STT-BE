@@ -13,13 +13,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
-    - name: Verify working directory contents
-      run: |
-        echo "🔍 경로 확인"
-        pwd
-        echo "🔍 현재 디렉토리 확인"
-        ls -al
-
     - name: Install Docker Compose
       run: |
         sudo apt-get update
@@ -68,7 +61,7 @@ jobs:
     # 2️⃣ 서버로 `docker-compose.yml`을 전송
     - name: Transfer Docker Compose file to temporary location
       run: |
-        scp -o StrictHostKeyChecking=no docker-compose.yml \
+        scp -o StrictHostKeyChecking=no $(pwd)/docker-compose.yml \
           ${{ secrets.SSH_ID }}@${{ secrets.SSH_SERVER_IP }}:/tmp/docker-compose.yml
 
     # 3️⃣ `/home/ubuntu/chic_stt/docker-compose.yml`로 이동 (또는 원하는 경로 설정)
